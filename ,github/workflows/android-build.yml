@@ -1,0 +1,49 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. ソースコードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. JDK（Java）をセットアップ
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      # 3. Gradleのキャッシュ（高速化）
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}
+
+      # 4. 権限付与（必要なら）
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # 5. ビルド実行
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+
+      # 6. APKの成果物をアップロード（オプション）
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
