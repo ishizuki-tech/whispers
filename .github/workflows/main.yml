@@ -123,13 +123,12 @@ jobs:
           draft: false
           prerelease: false
 
-      # 14. APKをReleaseに添付
+      # 14. APKをReleaseに添付（最新バージョンのgh-releaseを利用）
       - name: Upload APK to Release
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          files: app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/build/outputs/apk/release/app-release.apk
-          asset_name: app-release.apk
-          asset_content_type: application/vnd.android.package-archive
+
