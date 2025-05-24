@@ -20,7 +20,7 @@ This project uses GitHub Actions to automate the build and release of the Androi
 
 - If you have access, you can manually trigger the workflow via the link below:
 
-👉 [Run Android CI & Dynamic Release](../../actions/workflows/android-ci-release.yml)
+👉 [Run Android CI & Dynamic Release](../../actions/workflows/main.yml)
 
 > ⚠️ You need **write permissions** or **access to GitHub Actions** on this repository to run workflows manually.
 
