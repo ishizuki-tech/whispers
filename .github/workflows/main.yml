@@ -11,18 +11,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. ソースコードをチェックアウト
-      - name: Checkout code
+      # 1. ソースコードとサブモジュールもチェックアウト
+      - name: Checkout code (with submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      # 2. JDK（Java）をセットアップ
+      # 2. JDK（Java）セットアップ
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 17
 
-      # 3. Gradleのキャッシュ（高速化）
+      # 3. NDK（JNI/NDKプロジェクト用。必要な場合のみ）
+      - name: Set up Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: 25.2.9519653
+
+      # 4. Gradleのキャッシュ（ビルド高速化）
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -33,15 +41,19 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}
 
-      # 4. 権限付与（必要なら）
+      # 5. gradlew実行権限付与
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 5. ビルド実行
+      # 6. ビルド前にサブモジュール＆JNIのソースがあるかチェック（デバッグ用/任意）
+      - name: List JNI sources (debug)
+        run: ls -lR nativelib/
+
+      # 7. GradleでReleaseビルド
       - name: Build with Gradle (Release)
         run: ./gradlew assembleRelease
 
-      # 6. APKの成果物をアップロード（オプション）
+      # 8. Release APK成果物アップロード
       - name: Upload APK (Release)
         uses: actions/upload-artifact@v4
         with:
