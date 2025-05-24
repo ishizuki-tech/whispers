@@ -1,11 +1,8 @@
 name: Android CI & Dynamic Release
 
 on:
-  push:
-    branches: [ main ]            # mainブランチへのpushで起動
-  pull_request:
-    branches: [ main ]            # mainブランチへのPRでも起動
-
+  workflow_dispatch:
+  
 jobs:
   build-and-release:
     runs-on: ubuntu-latest        # GitHub提供のUbuntuランナーを使用
