@@ -12,3 +12,6 @@ This project provides detailed compatibility information for Android UIs and dev
 ---
 
 > Choose your preferred language to view detailed device specs, UI compatibility, and recommended Compose versions.
+
+## ▶️ Run CI manually
+[Run Android CI & Dynamic Release](../../actions/workflows/main.yml)
