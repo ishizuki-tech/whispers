@@ -17,7 +17,6 @@ import java.io.File
 import java.util.*
 import kotlinx.serialization.encodeToString
 import androidx.compose.runtime.snapshotFlow
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.collectLatest
 
 private const val LOG_TAG = "MainScreenViewModel"
@@ -39,13 +38,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
     var myRecords by mutableStateOf(emptyList<myRecord>())
         private set
-
-//    var selectedIndex by mutableStateOf(-1)
-//        private set
-//
-//    fun updateSelectedIndex(index: Int) {
-//        selectedIndex = index
-//    }
 
     var translateToEnglish by mutableStateOf(false)
         private set
