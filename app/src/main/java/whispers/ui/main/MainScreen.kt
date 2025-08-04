@@ -35,8 +35,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DismissDirection
-import androidx.compose.material3.DismissValue
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,12 +44,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismiss
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxDefaults
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -119,7 +119,9 @@ private fun MainScreen(
                     pendingDeleteIndex = it
                     showDeleteDialog = true
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             )
 
             StyledButton(
@@ -159,7 +161,7 @@ private fun TopBar(viewModel: MainScreenViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Mic, contentDescription = null, tint = Color(0xFF2196F3))
+                Icon(Icons.Default.Mic, contentDescription = "Mic icon", tint = Color(0xFF2196F3))
                 Text("Whisper App", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
                 LanguageLabel(
                     languageCode = viewModel.selectedLanguage,
@@ -255,8 +257,13 @@ private fun RecordingList(
     onDeleteRequest: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LaunchedEffect(records.size, records.lastOrNull()?.logs) {
-        if (records.isNotEmpty()) listState.animateScrollToItem(records.lastIndex)
+    // 新しい要素追加時のみスクロール
+    val previousSize = remember { mutableStateOf(records.size) }
+    LaunchedEffect(records.size) {
+        if (records.size > previousSize.value) {
+            listState.animateScrollToItem(records.lastIndex)
+        }
+        previousSize.value = records.size
     }
 
     LazyColumn(
@@ -265,17 +272,12 @@ private fun RecordingList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        itemsIndexed(records) { index, record ->
+        itemsIndexed(records, key = { _, record -> record.absolutePath }) { index, record ->
             val isSelected = index == selectedIndex
-            val dismissState = rememberDismissState(confirmValueChange = {
-                if (it == DismissValue.DismissedToStart || it == DismissValue.DismissedToEnd) {
-                    onDeleteRequest(index)
-                    false
-                } else true
-            })
             val animatedCorner by animateDpAsState(
                 targetValue = if (isSelected && !canTranscribe) 48.dp else 16.dp,
-                animationSpec = tween(400), label = "cornerAnim"
+                animationSpec = tween(400),
+                label = "cornerAnim"
             )
 
             val scale = if (isSelected && !canTranscribe) {
@@ -299,33 +301,45 @@ private fun RecordingList(
                 }
             } else Modifier
 
-            SwipeToDismiss(
-                state = dismissState,
-                directions = setOf(DismissDirection.StartToEnd),
-                background = {
-                    Box(Modifier.fillMaxSize().padding(start = 20.dp), contentAlignment = Alignment.CenterStart) {
-                        Text("削除", color = Color.Red, fontWeight = FontWeight.Bold)
+            val swipeState = rememberSwipeToDismissBoxState(
+                confirmValueChange = { newValue ->
+                    if (newValue == SwipeToDismissBoxValue.EndToStart) {
+                        onDeleteRequest(index)
                     }
-                },
-                dismissContent = {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer(scaleX = scale, scaleY = scale)
-                            .then(tapModifier),
-                        shape = RoundedCornerShape(animatedCorner),
-                        colors = CardDefaults.cardColors(
-                            containerColor = when {
-                                isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                canTranscribe -> MaterialTheme.colorScheme.secondaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        )
-                    ) {
-                        Text(record.logs, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
-                    }
+                    true
                 }
             )
+
+            SwipeToDismissBox(
+                state = swipeState,
+                modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale),
+                backgroundContent = {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text("削除", color = Color.Red, fontWeight = FontWeight.Bold)
+                    }
+                }
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(tapModifier),
+                    shape = RoundedCornerShape(animatedCorner),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when {
+                            isSelected -> MaterialTheme.colorScheme.primaryContainer
+                            canTranscribe -> MaterialTheme.colorScheme.secondaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    )
+                ) {
+                    Text(record.logs, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }

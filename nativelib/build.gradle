@@ -1,36 +1,39 @@
+// nativelib を AAR としてビルドする Android ライブラリモジュール
 plugins {
-    id 'com.android.library'
-    id 'org.jetbrains.kotlin.android'
+    // version catalog を使っている前提のエイリアス。実際の alias 名は libs.versions.toml のキーに合わせてください。
+    alias(libs.plugins.android.library) // Android ライブラリプラグイン
+    alias(libs.plugins.kotlin.android)  // Kotlin Android サポート
 }
 
 android {
-    namespace 'com.whispercpp'
+    // パッケージの名前空間（AndroidManifest 等の基準）
+    namespace "com.whispercpp"
 
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         minSdk 26
-        targetSdk 34
 
+        // 出力対象の ABI を限定してサイズを抑える（ここでは arm64-v8a のみ）。
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+            abiFilters "arm64-v8a" // 必要なら "armeabi-v7a" などを追加可能
         }
 
-        // ネイティブビルドのCMake設定
+        // CMake に渡すカスタム引数（プロジェクトプロパティ経由で柔軟に切り替えられるように）
         externalNativeBuild {
             cmake {
-                // CMakeで追加の引数が必要な場合、build.gradleにプロパティを定義して対応できます
-                // 例: -DGGML_HOME=/your/path に対応するプロパティ
-                if (project.hasProperty('GGML_HOME')) {
-                    arguments "-DGGML_HOME=${project.property('GGML_HOME')}"
+                // ggml のホームパスを外部から指定できるようにする
+                if (project.hasProperty("GGML_HOME")) {
+                    arguments += "-DGGML_HOME=${project.property("GGML_HOME")}"
                 }
-                // 以下のような OpenCL 対応構成も条件付きで追加可能
-                if (project.findProperty('GGML_CLBLAST') == 'ON') {
+
+                // CLBlast / OpenCL 周りのオプションを条件付きで有効化
+                if (project.findProperty("GGML_CLBLAST") == "ON") {
                     arguments += [
                             "-DGGML_CLBLAST=ON",
-                            "-DOPENCL_LIB=${project.property('OPENCL_LIB')}",
-                            "-DCLBLAST_HOME=${project.property('CLBLAST_HOME')}",
-                            "-DOPENCL_ROOT=${project.property('OPENCL_ROOT')}",
+                            "-DOPENCL_LIB=${project.property("OPENCL_LIB")}",
+                            "-DCLBLAST_HOME=${project.property("CLBLAST_HOME")}",
+                            "-DOPENCL_ROOT=${project.property("OPENCL_ROOT")}",
                             "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH",
                             "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH"
                     ]
@@ -41,37 +44,41 @@ android {
 
     buildTypes {
         release {
+            // ネイティブ部のデバッグ無しで縮小はオフ（必要ならリリース用に調整）
             minifyEnabled false
         }
     }
 
+    // Java/Kotlin の互換性設定
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
-
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = "17"
     }
 
+    // 固定の NDK バージョンを指定（ビルドの再現性確保のため）
     ndkVersion "28.1.13356709"
 
+    // ネイティブビルドの CMakeLists.txt の位置（外部ビルド設定）
     externalNativeBuild {
         cmake {
-            // JNI CMakeLists のパス
             path = file("src/main/jni/whisper/CMakeLists.txt")
         }
     }
 
+    // パッケージング時に不要なメタ情報を除外して APK/AAR サイズを最適化
     packagingOptions {
         resources {
-            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
 
 dependencies {
-    implementation libs.androidx.core.ktx.v190
-    implementation libs.androidx.appcompat
-    implementation libs.material.v180
+    // 基本の AndroidX とマテリアル
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
 }

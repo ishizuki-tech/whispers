@@ -1,13 +1,13 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-    // Kotlin Serialization 用プラグイン
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.10'
+    id 'org.jetbrains.kotlin.android' version '2.0.21'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '2.0.21'
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.0.21'
 }
 
 android {
     namespace 'com.whispercppdemo'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.whispercppdemo"
@@ -17,7 +17,7 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // VectorDrawable をサポートライブラリで有効化
+        // VectorDrawable をサポートライブラリ経由で使う設定
         vectorDrawables {
             useSupportLibrary true
         }
@@ -25,18 +25,18 @@ android {
 
     buildTypes {
         release {
-            // デモ用に debug の署名設定を使う（本番では置き換える）
             signingConfig signingConfigs.debug
             minifyEnabled true
+            // 標準の最適化ルールとプロガード設定を読み込む
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
+    // Java / Kotlin 両対応の互換性
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = '17'
     }
@@ -45,66 +45,78 @@ android {
         compose true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = '1.5.3'
-    }
+    // Kotlin 2.0+ かつ org.jetbrains.kotlin.plugin.compose を使っているときは
+    // 手動で kotlinCompilerExtensionVersion を指定する必要は基本的にない（衝突を避ける）。
+    // composeOptions {
+    //     kotlinCompilerExtensionVersion = '1.5.3'
+    // }
 }
 
 dependencies {
-    // ネイティブライブラリモジュールの参照
+    // ネイティブライブラリモジュールへの依存（Whisper core など）
     implementation project(':nativelib')
 
-    // Jetpack Compose 基本UI
-    implementation 'androidx.activity:activity-compose:1.7.2'
-    implementation "androidx.compose.ui:ui:1.5.0"
-    implementation "androidx.compose.ui:ui-tooling-preview:1.5.0"
-    implementation 'androidx.compose.material:material-icons-core:1.5.0'
-    implementation 'androidx.compose.material:material-icons-extended'
-    implementation 'androidx.compose.material3:material3:1.1.1'
+    // Compose の BOM を使ってバージョンを統一
+    implementation platform(libs.androidx.compose.bom)
 
-    // ViewModelとComposeの統合
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1'
+    // Compose / UI 関連（BOM があるのでバージョンは省略）
+    implementation libs.androidx.activity.compose
+    implementation libs.androidx.ui                  // alias for compose UI
+    implementation libs.androidx.ui.tooling.preview  // preview tooling
+    implementation libs.androidx.material3           // Material3
+    implementation libs.androidx.material.icons.extended // アイコン拡張（例: Icons.Filled.Mic）
 
-    // 権限ハンドリング
-    implementation "com.google.accompanist:accompanist-permissions:0.28.0"
+    // AndroidX 基盤（CoreComponentFactory 対策含む）
+    implementation libs.androidx.core.ktx.v1160
+    implementation libs.androidx.appcompat.v171
 
-    // Kotlinコルーチン & シリアライゼーション
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.2'
-    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0'
+    // ViewModel + Compose 統合
+    implementation libs.androidx.lifecycle.viewmodel.compose
 
-    // テスト
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation "androidx.compose.ui:ui-test-junit4:1.5.0"
-    debugImplementation "androidx.compose.ui:ui-tooling:1.5.0"
-    debugImplementation "androidx.compose.ui:ui-test-manifest:1.5.0"
+    // 権限ハンドリング（Accompanist）
+    implementation libs.accompanist.permissions
+
+    // Kotlin コルーチン & シリアライゼーション
+    implementation libs.kotlinx.coroutines.core
+    implementation libs.kotlinx.serialization.json
+
+    // テスト周り（必要ならコメントを外して使う）
+    // testImplementation 'junit:junit:4.13.2'
+    // androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    // androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    // androidTestImplementation "androidx.compose.ui:ui-test-junit4:1.5.0"
+    // debugImplementation "androidx.compose.ui:ui-tooling:1.5.0"
+    // debugImplementation "androidx.compose.ui:ui-test-manifest:1.5.0"
 }
 
-//
-// サブモジュール（submodule）が初期化されていない場合に自動で初期化
-//
-tasks.register('checkSubmodule') {
+// サブモジュール（例: whisper_core）が存在しないか空の場合、再帰的に初期化 & 更新するセットアップタスク
+tasks.register("checkSubmodule") {
+    description = "Ensure the git submodule 'nativelib/whisper_core' is initialized and populated."
+    group = "setup"
+
     doLast {
         def submoduleDir = file("nativelib/whisper_core")
-        if (!submoduleDir.exists() || submoduleDir.list().length == 0) {
-            println "🔄 Initializing submodules..."
+
+        // ディレクトリが存在しない、または中身が空なら初期化
+        def isMissingOrEmpty = !submoduleDir.exists() || (submoduleDir.listFiles()?.length ?: 0) == 0
+        if (isMissingOrEmpty) {
+            println "🔄 Submodule '${submoduleDir}' is missing or empty. Initializing/updating recursively..."
             exec {
-                commandLine "git", "submodule", "update", "--init", "--recursive"
+                commandLine("git", "submodule", "update", "--init", "--recursive")
             }
         } else {
-            println "✅ Submodule already initialized."
+            println "✅ Submodule '${submoduleDir}' already initialized and populated."
         }
     }
 }
 
-//
-// 音声モデル（ggmlモデルなど）をダウンロードするスクリプト実行タスク
-//
-tasks.register('downloadModel', Exec) {
-    commandLine '/bin/bash', './download_models.sh'
+// モデルをダウンロードするスクリプトタスク（存在しなければ取得）
+tasks.register("downloadModel", Exec) {
+    description = "Download required ggml/Whisper models via the helper script."
+    group = "setup"
+    commandLine "/bin/bash", "./download_models.sh"
 }
 
-// ビルド前に submodule & モデルをチェック・ダウンロード
-preBuild.dependsOn checkSubmodule
-preBuild.dependsOn downloadModel
+// ビルド前に必須のセットアップタスクを確実に実行
+preBuild.dependsOn tasks.named("checkSubmodule")
+preBuild.dependsOn tasks.named("downloadModel")
